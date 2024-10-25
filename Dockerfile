@@ -28,4 +28,4 @@ ENV OUTPUT_CSV_PATH=/app/output/occupation_credentials_output.csv
 WORKDIR /app
 
 # Entry point for the Docker container
-CMD ["python", "app/main.py"]
+CMD ["python", "main.py"]
