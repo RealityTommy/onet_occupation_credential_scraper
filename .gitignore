@@ -1,0 +1,35 @@
+# Python bytecode
+*.py[cod]
+__pycache__/
+*.so
+
+# Virtual environment directory
+venv/
+env/
+
+# Environment variables file (if using .env)
+.env
+
+# Logs
+*.log
+
+# Cache directories
+.cache/
+__pycache__/
+
+# Output and temporary files
+output/
+input/
+*.csv
+*.png
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# PyCharm and VSCode settings
+.idea/
+.vscode/
