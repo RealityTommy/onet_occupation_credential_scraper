@@ -12,17 +12,12 @@ from selenium.webdriver.common.keys import Keys
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-# Set up paths based on environment variables
-CHROME_DRIVER_PATH = os.getenv(
-    "CHROME_DRIVER_PATH"
-)  # Path to the ChromeDriver executable
-BASE_DIR = os.getenv("OUTPUT_DIR_PATH")  # Base directory for input/output files
-INPUT_DIR = os.path.join(BASE_DIR, "input")
-OUTPUT_DIR = os.path.join(BASE_DIR, "output")
-
-# Input and output file paths
-INPUT_CSV = os.path.join(INPUT_DIR, "occupation_input.csv")
-OUTPUT_CSV = os.path.join(OUTPUT_DIR, "occupation_credentials_output.csv")
+# Set up paths based on environment variables or use default paths
+CHROME_DRIVER_PATH = os.getenv("CHROME_DRIVER_PATH", "/usr/bin/chromedriver")
+INPUT_CSV = os.getenv("INPUT_CSV_PATH", "/app/input/occupation_input.csv")
+OUTPUT_CSV = os.getenv(
+    "OUTPUT_CSV_PATH", "/app/output/occupation_credentials_output.csv"
+)
 
 
 def setup_driver():
@@ -38,6 +33,9 @@ def setup_driver():
     chrome_options.add_argument(
         "--no-sandbox"
     )  # For running Chrome as root in containers
+    chrome_options.add_argument(
+        "--disable-dev-shm-usage"
+    )  # Overcome limited resource problems
     service = Service(CHROME_DRIVER_PATH)  # Point to the ChromeDriver executable
     driver = webdriver.Chrome(
         service=service, options=chrome_options
@@ -230,7 +228,11 @@ def main():
 
     # Loop through each occupation in the CSV using tqdm for progress display
     for index, row in tqdm(
-        df.iterrows(), total=total_occupations, desc="Processing Occupations"
+        df.iterrows(),
+        total=total_occupations,
+        desc="Processing Occupations",
+        ncols=100,
+        ascii=True,
     ):
         occupation_name = row["occupation name"]
         occupation_code = row["onet code"]

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  onet_scraper:
+    build: .
+    container_name: onet_scraper
+    environment:
+      - CHROME_DRIVER_PATH=/usr/bin/chromedriver
+      - INPUT_CSV_PATH=/app/input/occupation_input.csv
+      - OUTPUT_CSV_PATH=/app/output/occupation_credentials_output.csv
+    env_file:
+      - ./.env # Load environment variables from .env file
+    volumes:
+      - ./input:/app/input # Mount the input directory from the host to the container
+      - ./output:/app/output # Mount the output directory from the host to the container
+    restart: unless-stopped
