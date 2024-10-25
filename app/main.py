@@ -10,11 +10,13 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from bs4 import BeautifulSoup
-from tqdm import tqdm  # Import tqdm for progress display
+from tqdm import tqdm
 
 # Set up paths based on environment variables
-CHROME_DRIVER_PATH = os.getenv("CHROME_DRIVER_PATH")
-BASE_DIR = os.getenv("OUTPUT_DIR_PATH")
+CHROME_DRIVER_PATH = os.getenv(
+    "CHROME_DRIVER_PATH"
+)  # Path to the ChromeDriver executable
+BASE_DIR = os.getenv("OUTPUT_DIR_PATH")  # Base directory for input/output files
 INPUT_DIR = os.path.join(BASE_DIR, "input")
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
 
@@ -26,7 +28,7 @@ OUTPUT_CSV = os.path.join(OUTPUT_DIR, "occupation_credentials_output.csv")
 def setup_driver():
     """
     Set up the Selenium WebDriver with options.
-    This function configures the browser (Chrome) to run in headless mode (no GUI).
+    This function configures the browser (Chrome) to run in headless mode (no GUI) and sets a page load timeout.
     """
     chrome_options = Options()
     chrome_options.add_argument(
@@ -40,10 +42,12 @@ def setup_driver():
     driver = webdriver.Chrome(
         service=service, options=chrome_options
     )  # Create the driver
+
+    driver.set_page_load_timeout(60)  # Set the page load timeout to 60 seconds
     return driver
 
 
-def scrape_certifications(driver, occupation_name, occupation_code):
+def scrape_certifications(driver, occupation_name, occupation_code, max_retries=3):
     """
     Scrape certifications for a specific occupation from ONET.
 
@@ -51,17 +55,50 @@ def scrape_certifications(driver, occupation_name, occupation_code):
         driver: Selenium WebDriver instance.
         occupation_name: The name of the occupation (e.g., "Software Developers").
         occupation_code: The ONET code for the occupation (e.g., "15-1121.00").
+        max_retries: Number of times to retry loading the page in case of a timeout.
 
     Returns:
-        A list of dictionaries containing certification details for the occupation.
+        A list of dictionaries containing certification details for the occupation,
+        and counts of successes and failures.
     """
     url = f"https://www.onetonline.org/link/localcert/{occupation_code}"
-    driver.get(url)  # Navigate to the URL
-    certifications = []  # List to store certification details
+    retries = 0
+    certifications = []
+
+    while retries < max_retries:
+        try:
+            driver.get(url)  # Navigate to the URL
+            break  # Exit loop if successful
+        except Exception as e:
+            print(f"Attempt {retries + 1} failed: {e}")
+            retries += 1
+            time.sleep(5)  # Wait for a few seconds before retrying
+
+    if retries == max_retries:
+        print(
+            f"Failed to load the page for {occupation_name} after {max_retries} attempts."
+        )
+        return certifications, 0, 1  # Return empty data indicating failure
+
     success_count = 0
     failure_count = 0
 
     try:
+        # Check if there are no certifications for the occupation
+        try:
+            no_cert_msg = driver.find_element(
+                By.XPATH, "/html/body/div/div[1]/div/div[2]/p[1]/b"
+            ).text
+            if "No certifications were found." in no_cert_msg:
+                print(f"No certifications were found for '{occupation_name}'")
+                return (
+                    certifications,
+                    0,
+                    1,
+                )  # Return indicating no certifications were found
+        except Exception:
+            pass  # No "No certifications were found" message, continue to find the table
+
         # Wait for the table containing certifications to load on the page
         table = WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.TAG_NAME, "table"))
