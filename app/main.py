@@ -89,6 +89,139 @@ def scrape_certifications(driver, occupation_name, occupation_code, max_retries=
             ).text
             if "No certifications were found." in no_cert_msg:
                 print(f"No certifications were found for '{occupation_name}'")
+                return certifications, 0, 0  # No certifications, but not a failure
+        except Exception:
+            pass  # No "No certifications were found" message, continue to find the table
+
+        # Wait for the table containing certifications to load on the page
+        table = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "table"))
+        )
+
+        # Find all the rows in the table, excluding the header row
+        rows = table.find_elements(By.TAG_NAME, "tr")[1:]
+        total_certifications = len(rows)
+
+        for i, row in enumerate(rows, start=1):
+            start_time = time.time()  # Start timer for each certification
+            try:
+                # Get the link (title) and certifying organization from each row
+                title_link = row.find_element(By.TAG_NAME, "a")
+                cert_name = (
+                    title_link.text.strip()
+                )  # Get the text for the certification name
+                cert_org = row.find_elements(By.TAG_NAME, "td")[
+                    1
+                ].text.strip()  # Get the organization name
+
+                # Click the title link to open the modal window containing details
+                driver.execute_script(
+                    "arguments[0].click();", title_link
+                )  # Use JS to click the link
+                WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located((By.ID, "ajaxModal"))
+                )
+                time.sleep(0.5)  # Pause to allow the modal to fully load
+
+                # Use BeautifulSoup to parse the modal content
+                modal_content = BeautifulSoup(driver.page_source, "html.parser")
+                # Find the description inside the modal
+                description_div = modal_content.select_one(
+                    "div#ajaxModal .accordion .accordion-item:nth-of-type(2) div div"
+                )
+                description = description_div.text.strip() if description_div else "N/A"
+
+                # Find the certifying organization's website link in the modal
+                org_link = modal_content.select_one(
+                    "div#ajaxModal .accordion .accordion-item:nth-of-type(1) a"
+                )
+                org_website = org_link["href"].strip() if org_link else "N/A"
+
+                # Add the certification details to the list
+                certifications.append(
+                    {
+                        "Occupation Name": occupation_name,
+                        "Credential Name": cert_name,
+                        "Credential Description": description,
+                        "Certifying Organization Name": cert_org,
+                        "Certifying Organization Website": org_website,
+                    }
+                )
+
+                # Close the modal using alternative methods
+                try:
+                    close_button = driver.find_element(
+                        By.CSS_SELECTOR,
+                        "button.close, .modal-header button, .btn-close",
+                    )
+                    driver.execute_script("arguments[0].click();", close_button)
+                except Exception:
+                    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                    time.sleep(0.5)
+
+                success_count += 1
+                elapsed_time = time.time() - start_time
+                certification_progress = (i / total_certifications) * 100
+                print(
+                    f"Certification Progress: {certification_progress:.2f}% - Successfully processed '{cert_name}' in {elapsed_time:.2f} seconds"
+                )
+
+            except Exception as cert_error:
+                elapsed_time = time.time() - start_time
+                failure_count += 1
+                certification_progress = (i / total_certifications) * 100
+                print(
+                    f"Certification Progress: {certification_progress:.2f}% - Failed to process certification in {elapsed_time:.2f} seconds: {cert_error}"
+                )
+
+    except Exception as e:
+        print(f"Error processing occupation {occupation_name} ({occupation_code}): {e}")
+
+    return certifications, success_count, failure_count
+
+    """
+    Scrape certifications for a specific occupation from ONET.
+
+    Parameters:
+        driver: Selenium WebDriver instance.
+        occupation_name: The name of the occupation (e.g., "Software Developers").
+        occupation_code: The ONET code for the occupation (e.g., "15-1121.00").
+        max_retries: Number of times to retry loading the page in case of a timeout.
+
+    Returns:
+        A list of dictionaries containing certification details for the occupation,
+        and counts of successes and failures.
+    """
+    url = f"https://www.onetonline.org/link/localcert/{occupation_code}"
+    retries = 0
+    certifications = []
+
+    while retries < max_retries:
+        try:
+            driver.get(url)  # Navigate to the URL
+            break  # Exit loop if successful
+        except Exception as e:
+            print(f"Attempt {retries + 1} failed: {e}")
+            retries += 1
+            time.sleep(5)  # Wait for a few seconds before retrying
+
+    if retries == max_retries:
+        print(
+            f"Failed to load the page for {occupation_name} after {max_retries} attempts."
+        )
+        return certifications, 0, 1  # Return empty data indicating failure
+
+    success_count = 0
+    failure_count = 0
+
+    try:
+        # Check if there are no certifications for the occupation
+        try:
+            no_cert_msg = driver.find_element(
+                By.XPATH, "/html/body/div/div[1]/div/div[2]/p[1]/b"
+            ).text
+            if "No certifications were found." in no_cert_msg:
+                print(f"No certifications were found for '{occupation_name}'")
                 return (
                     certifications,
                     0,
