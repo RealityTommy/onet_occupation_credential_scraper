@@ -1,38 +1,31 @@
-# Use the official Python 3 image compatible with ARM architecture
-FROM python:3.9-slim-buster
+# Use a Python image compatible with ARM architecture (Raspberry Pi)
+FROM arm64v8/python:3.9-slim-bullseye
 
-# Set the working directory in the container
-WORKDIR /app
-
-# Copy the requirements file first to leverage Docker cache
-COPY requirements.txt .
-
-# Install system dependencies for Selenium and ChromeDriver
+# Install dependencies including Chromium and ChromeDriver
 RUN apt-get update && apt-get install -y \
     wget \
     unzip \
-    chromium-browser \
+    chromium \
     chromium-driver \
     libnss3 \
-    libgconf-2-4 \
     libxss1 \
     libappindicator3-1 \
     fonts-liberation
 
-# Install Python dependencies
+# Copy the requirements.txt and install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
-COPY app /app/app
-COPY .env /app/.env
+# Copy the application code
+COPY app /app
 
-# Set environment variables for Chrome and ChromeDriver paths
+# Set environment variables for the ChromeDriver path, input CSV, and output CSV
 ENV CHROME_DRIVER_PATH=/usr/bin/chromedriver
 ENV INPUT_CSV_PATH=/app/input/occupation_input.csv
 ENV OUTPUT_CSV_PATH=/app/output/occupation_credentials_output.csv
 
-# Expose any necessary ports (if applicable)
-EXPOSE 5000
+# Set the working directory
+WORKDIR /app
 
-# Run the application
+# Entry point for the Docker container
 CMD ["python", "main.py"]
