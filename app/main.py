@@ -60,6 +60,23 @@ def parse_modal_content(driver):
     )
     description = description_div.text.strip() if description_div else "N/A"
 
+    # Check if description is a placeholder; replace it if necessary
+    if description == "More information about this certification external site":
+        description = "TODO: Write description."
+
+    org_link = modal_content.select_one(
+        "div#ajaxModal .accordion .accordion-item:nth-of-type(1) a"
+    )
+    org_website = org_link["href"].strip() if org_link else "N/A"
+
+    return description, org_website
+    """Extracts certification description and organization website from the modal."""
+    modal_content = BeautifulSoup(driver.page_source, "html.parser")
+    description_div = modal_content.select_one(
+        "div#ajaxModal .accordion .accordion-item:nth-of-type(2) div div"
+    )
+    description = description_div.text.strip() if description_div else "N/A"
+
     org_link = modal_content.select_one(
         "div#ajaxModal .accordion .accordion-item:nth-of-type(1) a"
     )
@@ -69,6 +86,104 @@ def parse_modal_content(driver):
 
 
 def scrape_certifications(driver, occupation_name, occupation_code, max_retries=3):
+    url = f"https://www.onetonline.org/link/localcert/{occupation_code}"
+    retries = 0
+    certifications = []
+
+    while retries < max_retries:
+        try:
+            driver.get(url)
+            break
+        except Exception as e:
+            logging.warning(f"Attempt {retries + 1} failed for {occupation_name}: {e}")
+            retries += 1
+            time.sleep(5)
+
+    if retries == max_retries:
+        logging.error(
+            f"Failed to load page for {occupation_name} after {max_retries} attempts."
+        )
+        return certifications, 0, 1
+
+    success_count = 0
+    failure_count = 0
+
+    try:
+        # Check if no certifications are available
+        try:
+            no_cert_msg = driver.find_element(
+                By.XPATH, "/html/body/div/div[1]/div/div[2]/p[1]/b"
+            ).text
+            if "No certifications were found." in no_cert_msg:
+                logging.info(f"No certifications found for {occupation_name}")
+                return certifications, 0, 0
+        except Exception:
+            pass
+
+        # Wait for certification table
+        table = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "table"))
+        )
+        rows = table.find_elements(By.TAG_NAME, "tr")[1:]
+
+        for row in rows:
+            try:
+                title_link = row.find_element(By.TAG_NAME, "a")
+                cert_name = title_link.text.strip()
+
+                # Skip if cert_name is empty
+                if not cert_name:
+                    logging.info(
+                        f"Skipped empty credential name for occupation '{occupation_name}'"
+                    )
+                    continue
+
+                cert_org = row.find_elements(By.TAG_NAME, "td")[1].text.strip()
+
+                # Open modal and parse content
+                driver.execute_script("arguments[0].click();", title_link)
+                WebDriverWait(driver, 10).until(
+                    EC.visibility_of_element_located((By.ID, "ajaxModal"))
+                )
+                time.sleep(0.5)
+                description, org_website = parse_modal_content(driver)
+
+                # Add certification details to list
+                certifications.append(
+                    {
+                        "Occupation Name": occupation_name,
+                        "Credential Name": cert_name,
+                        "Credential Description": description,
+                        "Certifying Organization Name": cert_org,
+                        "Certifying Organization Website": org_website,
+                    }
+                )
+
+                # Close modal
+                try:
+                    close_button = driver.find_element(
+                        By.CSS_SELECTOR,
+                        "button.close, .modal-header button, .btn-close",
+                    )
+                    driver.execute_script("arguments[0].click();", close_button)
+                except Exception:
+                    driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                    time.sleep(0.5)
+
+                success_count += 1
+
+            except Exception as cert_error:
+                logging.error(
+                    f"Failed to process certification for {occupation_name}: {cert_error}"
+                )
+                failure_count += 1
+
+    except Exception as e:
+        logging.error(
+            f"Error processing occupation {occupation_name} ({occupation_code}): {e}"
+        )
+
+    return certifications, success_count, failure_count
     url = f"https://www.onetonline.org/link/localcert/{occupation_code}"
     retries = 0
     certifications = []
