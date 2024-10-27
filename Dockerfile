@@ -21,8 +21,8 @@ COPY app /app
 
 # Set environment variables for the ChromeDriver path, input CSV, and output CSV
 ENV CHROME_DRIVER_PATH=/usr/bin/chromedriver
-ENV INPUT_CSV_PATH=/app/input/occupation_input.csv
-ENV OUTPUT_CSV_PATH=/app/output/occupation_credentials_output.csv
+ENV INPUT_CSV_PATH=/input/occupation_input.csv
+ENV OUTPUT_CSV_PATH=/output/occupation_credentials_output.csv
 
 # Set the working directory
 WORKDIR /app
