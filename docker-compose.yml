@@ -13,4 +13,4 @@ services:
     volumes:
       - ./input:/input # Mount the input directory from the host to the container
       - ./output:/output # Mount the output directory from the host to the container
-    restart: unless-stopped
+    restart: no
