@@ -61,7 +61,7 @@ def parse_modal_content(driver):
     description = description_div.text.strip() if description_div else "N/A"
 
     # Check if description is a placeholder; replace it if necessary
-    if description == "More information about this certification external site":
+    if description == "More information about this certification":
         description = "TODO: Write description."
 
     org_link = modal_content.select_one(
